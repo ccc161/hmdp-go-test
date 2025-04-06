@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"hmdp-go-test/models"
 	"hmdp-go-test/utils"
+	"math/rand"
 	"os"
 	"strconv"
 	"sync"
@@ -250,7 +251,8 @@ func purchaseSeckillVoucherTimeoutContextWorker(ctx context.Context, stats *util
 			return
 		default:
 			purchaseSeckillVoucherWorker(stats, url, request)
-			//time.Sleep(time.Millisecond * 100)
+			randomInt := rand.Intn(200)
+			time.Sleep(time.Millisecond * time.Duration(randomInt))
 		}
 	}
 }
@@ -258,6 +260,7 @@ func purchaseSeckillVoucherTimeoutContextWorker(ctx context.Context, stats *util
 func purchaseSeckillVoucher(phonesAndAuths map[string]string, voucherId string, wg *sync.WaitGroup, duration time.Duration, stats *utils.RequestStats) {
 	ctx, cancel := context.WithTimeout(context.Background(), duration)
 	defer cancel()
+	stats.StartTime = time.Now()
 	for phone := range phonesAndAuths {
 		go func() {
 			defer wg.Done()
@@ -274,6 +277,7 @@ func purchaseSeckillVoucher(phonesAndAuths map[string]string, voucherId string, 
 	}
 	extra := time.Second
 	time.Sleep(duration + extra)
+	stats.EndTime = time.Now().Add(-extra)
 }
 
 func TestRestoreMysqlStock(t *testing.T) {

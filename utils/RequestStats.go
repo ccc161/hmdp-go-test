@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"sync/atomic"
+	"time"
 )
 
 type RespType int
@@ -23,6 +24,9 @@ type RequestStats struct {
 	PurchaseSuccessNano *atomic.Uint64
 	PurchaseFailNano    *atomic.Uint64
 	FailedNanoSeconds   *atomic.Uint64
+
+	StartTime time.Time
+	EndTime   time.Time
 }
 
 func NewRequestStats() *RequestStats {
@@ -81,8 +85,10 @@ func (s *RequestStats) formatBlock(
 }
 
 func (s *RequestStats) String() string {
-	return s.formatBlock("total", s.TotalRequestCount.Load(), s.TotalNanoSeconds.Load()) +
+	elapsed := uint64(s.EndTime.Sub(s.StartTime).Nanoseconds())
+	return s.formatBlock("total", s.TotalRequestCount.Load(), elapsed) +
+		s.formatBlock("replied", s.PurchaseSuccessCount.Load()+s.PurchaseFailCount.Load(), elapsed) +
 		s.formatBlock("purchase success", s.PurchaseSuccessCount.Load(), s.PurchaseSuccessNano.Load()) +
 		s.formatBlock("purchase failed", s.PurchaseFailCount.Load(), s.PurchaseFailNano.Load()) +
-		s.formatBlock("response failed", s.FailedRequestCount.Load(), s.FailedNanoSeconds.Load())
+		s.formatBlock("resp failed", s.FailedRequestCount.Load(), elapsed)
 }
