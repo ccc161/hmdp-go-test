@@ -69,7 +69,7 @@ func (s *RequestStats) formatBlock(
 	count uint64,
 	ns uint64,
 ) string {
-	seconds := ns / 1e9
+	seconds := float64(ns) / 1e9
 	var qps, avg float64
 	if count == 0 {
 		qps = 0.0

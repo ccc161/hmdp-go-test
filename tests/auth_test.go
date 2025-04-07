@@ -183,4 +183,5 @@ func TestGenerateAuths(t *testing.T) {
 		}
 	}
 	assert.GreaterOrEqual(t, expectedAuthsCount, int(successCount.Load()))
+	assert.Equal(t, expectedAuthsCount, int(successCount.Load()))
 }

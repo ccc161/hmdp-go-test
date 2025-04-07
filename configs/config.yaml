@@ -24,12 +24,13 @@ api:
 test:
   user:
     base_phone: 18000000000
-    user_count: 1000
+    user_count: 10000
     auth_file_name: "auths.csv"
     batch_size: 1000
   voucher:
     id: 5
     stock: 100
-    purchase_duration_sec: 60 # 购买压力测试持续时间，0代表每个账号只发送一次购买请求
+    max_concurrency: 500
+    purchase_duration_sec: 0 # 购买压力测试持续时间，0代表每个账号只发送一次购买请求
 
 

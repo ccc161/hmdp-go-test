@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"hmdp-go-test/models"
 	"hmdp-go-test/utils"
-	"math/rand"
+	"io"
 	"os"
 	"strconv"
 	"sync"
@@ -124,9 +124,10 @@ func cleanRedisDatabase(ctx context.Context, voucherId string, stock int) {
 	RedisClient.Del(ctx, "seckill:order:"+voucherId)
 	// 恢复redis库存
 	RedisClient.Set(ctx, "seckill:stock:"+voucherId, strconv.Itoa(stock), -1)
+	var keys []string
 	// 删除登录token
-	keys := RedisClient.Keys(ctx, "login:*").Val()
-	RedisClient.Del(ctx, keys...)
+	//keys = RedisClient.Keys(ctx, "login:*").Val()
+	//RedisClient.Del(ctx, keys...)
 	// 删除自定义拦截器
 	keys = RedisClient.Keys(ctx, "rate:*").Val()
 	RedisClient.Del(ctx, keys...)
@@ -202,11 +203,12 @@ func TestSeckillVoucher(t *testing.T) {
 	voucherId := viper.GetString("test.voucher.id")
 	stock := viper.GetInt("test.voucher.stock")
 	cleanRedisDatabase(context.Background(), voucherId, stock)
-	err := os.Remove(AuthsFilePath)
-	if err != nil && !os.IsNotExist(err) {
-		t.Fatalf("failed to remove auth file: %v", err)
-	}
-	TestGenerateAuths(t)
+	//err := os.Remove(AuthsFilePath)
+	//if err != nil && !os.IsNotExist(err) {
+	//	t.Fatalf("failed to remove auth file: %v", err)
+	//}
+	//TestGenerateAuths(t)
+	//panic("implement me")
 	phonesAndAuths := getPhonesAndAuths(t)
 	cleanDatabase(t, phonesAndAuths, voucherId, stock)
 	wg := &sync.WaitGroup{}
@@ -221,10 +223,19 @@ func TestSeckillVoucher(t *testing.T) {
 func purchaseSeckillVoucherWorker(stats *utils.RequestStats, url string, request *resty.Request) {
 	start := time.Now()
 	response, err := request.Post(url)
+	defer func(body io.ReadCloser) {
+		if body == nil {
+			return
+		}
+		err := body.Close()
+		if err != nil {
+		}
+	}(response.RawBody())
 	elapsed := time.Since(start)
 	nanosecond := uint64(elapsed.Nanoseconds())
 	if err != nil || response == nil {
 		stats.Record(utils.ResponseFail, nanosecond)
+		//fmt.Println(err.Error())
 		return
 	}
 	var result models.Result
@@ -251,8 +262,7 @@ func purchaseSeckillVoucherTimeoutContextWorker(ctx context.Context, stats *util
 			return
 		default:
 			purchaseSeckillVoucherWorker(stats, url, request)
-			randomInt := rand.Intn(200)
-			time.Sleep(time.Millisecond * time.Duration(randomInt))
+			time.Sleep(time.Millisecond * 500)
 		}
 	}
 }
@@ -260,10 +270,14 @@ func purchaseSeckillVoucherTimeoutContextWorker(ctx context.Context, stats *util
 func purchaseSeckillVoucher(phonesAndAuths map[string]string, voucherId string, wg *sync.WaitGroup, duration time.Duration, stats *utils.RequestStats) {
 	ctx, cancel := context.WithTimeout(context.Background(), duration)
 	defer cancel()
+	maxConcurrency := viper.GetInt("test.voucher.max_concurrency")
+	sem := make(chan struct{}, maxConcurrency)
 	stats.StartTime = time.Now()
 	for phone := range phonesAndAuths {
+		sem <- struct{}{} // 阻塞知道有可用槽位
 		go func() {
 			defer wg.Done()
+			defer func() { <-sem }()
 			url := PurchaseSeckillVoucherUrlPrefix + "/" + voucherId
 			auth := phonesAndAuths[phone]
 			request := HttpClient.R()
